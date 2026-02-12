@@ -68,7 +68,9 @@ export OBJS :=                                              	\
 																\
 ../src/tasks/radio/spp.o 									    \
 ../src/tests/test.o                                             \
-
+../src/comms/ring_buffer.o                                      \
+../src/comms/uart_comms.o                                       \
+../src/comms/uart_test.o                                        \
 
 ### ALL DIRECTORIES WITH SOURCE FILES MUST BE LISTED HERE ###
 ### THESE ARE WRITTEN RELATIVE TO THE ./ASF/gcc/Makefile FILE ###
@@ -94,6 +96,7 @@ export EXTRA_VPATH := \
 ../../src/mutexes \
 ../../src/checks \
 ../../src/tests \
+../../src/comms \
 
 
 ###############################################################################

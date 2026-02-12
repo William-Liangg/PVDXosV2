@@ -10,10 +10,24 @@
 
 #include "uart_comms.h"
 #include "ring_buffer.h"
-#include "driver_init.h"
 #include <atmel_start.h>
 #include <hpl_usart_async.h>
+#include <peripheral_clk_config.h>
 #include <string.h>
+
+/* SERCOM0 clock configuration (matching other SERCOMs) */
+#ifndef CONF_GCLK_SERCOM0_CORE_SRC
+#define CONF_GCLK_SERCOM0_CORE_SRC GCLK_PCHCTRL_GEN_GCLK0_Val
+#endif
+#ifndef CONF_GCLK_SERCOM0_SLOW_SRC
+#define CONF_GCLK_SERCOM0_SLOW_SRC GCLK_PCHCTRL_GEN_GCLK3_Val
+#endif
+#ifndef CONF_GCLK_SERCOM0_CORE_FREQUENCY
+#define CONF_GCLK_SERCOM0_CORE_FREQUENCY 12000000
+#endif
+
+/* USART device structure for SERCOM0 */
+static struct _usart_async_device usart0_device;
 
 /* Ring buffers for TX and RX */
 static ring_buffer_t tx_ring_buffer;
@@ -24,6 +38,8 @@ static volatile bool tx_in_progress = false;
 
 /* Forward declarations for internal functions */
 static void uart_start_tx(void);
+static void usart0_port_init(void);
+static void usart0_clock_init(void);
 
 /**
  * @brief SERCOM0 DRE (Data Register Empty) interrupt handler
@@ -38,10 +54,10 @@ void SERCOM0_0_Handler(void)
     /* Check if we have data to send */
     if (ring_buffer_read(&tx_ring_buffer, &byte) == 0) {
         /* Write the byte to the data register */
-        _usart_async_write_byte(&USART_0, byte);
+        _usart_async_write_byte(&usart0_device, byte);
     } else {
         /* No more data - disable DRE interrupt */
-        _usart_async_set_irq_state(&USART_0, USART_ASYNC_BYTE_SENT, false);
+        _usart_async_set_irq_state(&usart0_device, USART_ASYNC_BYTE_SENT, false);
         tx_in_progress = false;
     }
 }
@@ -98,8 +114,41 @@ static void uart_start_tx(void)
     if (!tx_in_progress && !ring_buffer_is_empty(&tx_ring_buffer)) {
         tx_in_progress = true;
         /* Enable DRE interrupt to start transmission */
-        _usart_async_set_irq_state(&USART_0, USART_ASYNC_BYTE_SENT, true);
+        _usart_async_set_irq_state(&usart0_device, USART_ASYNC_BYTE_SENT, true);
     }
+}
+
+/**
+ * @brief Initialize SERCOM0 port pins for USART
+ */
+static void usart0_port_init(void)
+{
+    /* TX pin (PA04) - output */
+    gpio_set_pin_level(GPIO(GPIO_PORTA, 4), false);
+    gpio_set_pin_direction(GPIO(GPIO_PORTA, 4), GPIO_DIRECTION_OUT);
+    gpio_set_pin_function(GPIO(GPIO_PORTA, 4), PINMUX_PA04D_SERCOM0_PAD0);
+
+    /* RX pin (PA05) - input */
+    gpio_set_pin_direction(GPIO(GPIO_PORTA, 5), GPIO_DIRECTION_IN);
+    gpio_set_pin_pull_mode(GPIO(GPIO_PORTA, 5), GPIO_PULL_OFF);
+    gpio_set_pin_function(GPIO(GPIO_PORTA, 5), PINMUX_PA05D_SERCOM0_PAD1);
+}
+
+/**
+ * @brief Initialize SERCOM0 clocks for USART
+ */
+static void usart0_clock_init(void)
+{
+    /* Enable SERCOM0 core clock */
+    hri_gclk_write_PCHCTRL_reg(GCLK, SERCOM0_GCLK_ID_CORE,
+                               CONF_GCLK_SERCOM0_CORE_SRC | (1 << GCLK_PCHCTRL_CHEN_Pos));
+
+    /* Enable SERCOM0 slow clock */
+    hri_gclk_write_PCHCTRL_reg(GCLK, SERCOM0_GCLK_ID_SLOW,
+                               CONF_GCLK_SERCOM0_SLOW_SRC | (1 << GCLK_PCHCTRL_CHEN_Pos));
+
+    /* Enable SERCOM0 APB clock */
+    hri_mclk_set_APBAMASK_SERCOM0_bit(MCLK);
 }
 
 status_t uart_comms_init(void)
@@ -108,14 +157,23 @@ status_t uart_comms_init(void)
     ring_buffer_init(&tx_ring_buffer);
     ring_buffer_init(&rx_ring_buffer);
 
+    /* Initialize SERCOM0 clocks */
+    usart0_clock_init();
+
+    /* Initialize the USART async device */
+    _usart_async_init(&usart0_device, SERCOM0);
+
+    /* Initialize port pins */
+    usart0_port_init();
+
     /* Enable the USART peripheral */
-    _usart_async_enable(&USART_0);
+    _usart_async_enable(&usart0_device);
 
     /* Enable RX interrupt (always listening) */
-    _usart_async_set_irq_state(&USART_0, USART_ASYNC_RX_DONE, true);
+    _usart_async_set_irq_state(&usart0_device, USART_ASYNC_RX_DONE, true);
 
     /* Enable error interrupt */
-    _usart_async_set_irq_state(&USART_0, USART_ASYNC_ERROR, true);
+    _usart_async_set_irq_state(&usart0_device, USART_ASYNC_ERROR, true);
 
     return SUCCESS;
 }

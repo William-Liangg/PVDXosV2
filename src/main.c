@@ -12,6 +12,7 @@
 #include "main.h"
 
 #include "checks/device_checks.h"
+#include "comms/uart_test.h"
 #include "globals.h"
 #include "logging.h"
 #include "tests/test.h"
@@ -33,6 +34,10 @@ int main(void) {
 
     /* Initializes MCU, drivers and middleware */
     atmel_start_init();
+
+    /* UART hardware test - blocks forever (remove after testing) */
+    uart_test_run();
+
     PVDX_init();
     // info_impl(RTT_CTRL_RESET RTT_CTRL_CLEAR); // Reset the terminal
     info("--- Atmel & Hardware Initialization Complete ---\n");
