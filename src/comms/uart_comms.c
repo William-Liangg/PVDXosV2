@@ -15,17 +15,6 @@
 #include <peripheral_clk_config.h>
 #include <string.h>
 
-/* SERCOM0 clock configuration (matching other SERCOMs) */
-#ifndef CONF_GCLK_SERCOM0_CORE_SRC
-#define CONF_GCLK_SERCOM0_CORE_SRC GCLK_PCHCTRL_GEN_GCLK0_Val
-#endif
-#ifndef CONF_GCLK_SERCOM0_SLOW_SRC
-#define CONF_GCLK_SERCOM0_SLOW_SRC GCLK_PCHCTRL_GEN_GCLK3_Val
-#endif
-#ifndef CONF_GCLK_SERCOM0_CORE_FREQUENCY
-#define CONF_GCLK_SERCOM0_CORE_FREQUENCY 12000000
-#endif
-
 /* USART device structure for SERCOM0 */
 static struct _usart_async_device usart0_device;
 
@@ -168,6 +157,16 @@ status_t uart_comms_init(void)
 
     /* Enable the USART peripheral */
     _usart_async_enable(&usart0_device);
+
+    /* Configure baud rate to 115200 with 16x oversampling */
+    uint16_t baud_val = _usart_async_calculate_baud_rate(
+        115200,                              /* desired baud rate */
+        CONF_GCLK_SERCOM0_CORE_FREQUENCY,    /* clock frequency (12MHz) */
+        16,                                  /* samples (16x oversampling) */
+        USART_BAUDRATE_ASYNCH_ARITHMETIC,    /* async arithmetic mode */
+        0                                    /* no fractional part */
+    );
+    _usart_async_set_baud_rate(&usart0_device, baud_val);
 
     /* Enable RX interrupt (always listening) */
     _usart_async_set_irq_state(&usart0_device, USART_ASYNC_RX_DONE, true);

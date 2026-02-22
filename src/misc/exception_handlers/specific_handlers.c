@@ -191,6 +191,7 @@ void RAMECC_Handler(void) {
 }
 */
 
+/* --- ALREADY DEFINED IN "uart_comms.c"
 void SERCOM0_0_Handler(void) {
     PVDX_default_handler();
 }
@@ -203,6 +204,7 @@ void SERCOM0_2_Handler(void) {
 void SERCOM0_3_Handler(void) {
     PVDX_default_handler();
 }
+*/
 void SERCOM1_0_Handler(void) {
     PVDX_default_handler();
 }
